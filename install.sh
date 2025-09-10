@@ -185,7 +185,7 @@ cd ..
 print_status "Setting permissions..."
 chmod +x start.sh
 chmod +x test.sh
-chmod +x demo.sh
+chmod +x test-config.sh
 chmod +x backend/web-ui-mgmt
 
 # Create systemd service
