@@ -106,31 +106,62 @@ fi
 # Start uninstallation
 print_status "Uninstalling Web UI Management..."
 
-# Stop and disable service
-print_status "Stopping and disabling service..."
+# Stop and disable services
+print_status "Stopping and disabling services..."
+
+# Stop main service
 if sudo systemctl is-active --quiet $SERVICE_NAME; then
     sudo systemctl stop $SERVICE_NAME
-    print_status "Service stopped."
+    print_status "Main service stopped."
 else
-    print_warning "Service was not running."
+    print_warning "Main service was not running."
 fi
 
+# Stop rules loader service
+if sudo systemctl is-active --quiet web-ui-mgmt-rules; then
+    sudo systemctl stop web-ui-mgmt-rules
+    print_status "Rules loader service stopped."
+else
+    print_warning "Rules loader service was not running."
+fi
+
+# Disable main service
 if sudo systemctl is-enabled --quiet $SERVICE_NAME; then
     sudo systemctl disable $SERVICE_NAME
-    print_status "Service disabled."
+    print_status "Main service disabled."
 else
-    print_warning "Service was not enabled."
+    print_warning "Main service was not enabled."
 fi
 
-# Remove systemd service file
-print_status "Removing systemd service file..."
+# Disable rules loader service
+if sudo systemctl is-enabled --quiet web-ui-mgmt-rules; then
+    sudo systemctl disable web-ui-mgmt-rules
+    print_status "Rules loader service disabled."
+else
+    print_warning "Rules loader service was not enabled."
+fi
+
+# Remove systemd service files
+print_status "Removing systemd service files..."
+
+# Remove main service file
 if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
     sudo rm -f "/etc/systemd/system/$SERVICE_NAME.service"
-    sudo systemctl daemon-reload
-    print_status "Service file removed."
+    print_status "Main service file removed."
 else
-    print_warning "Service file not found."
+    print_warning "Main service file not found."
 fi
+
+# Remove rules loader service file
+if [ -f "/etc/systemd/system/web-ui-mgmt-rules.service" ]; then
+    sudo rm -f "/etc/systemd/system/web-ui-mgmt-rules.service"
+    print_status "Rules loader service file removed."
+else
+    print_warning "Rules loader service file not found."
+fi
+
+# Reload systemd
+sudo systemctl daemon-reload
 
 # Remove firewall rule
 print_status "Removing firewall rule..."

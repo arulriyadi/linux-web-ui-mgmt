@@ -188,12 +188,31 @@ chmod +x test.sh
 chmod +x test-config.sh
 chmod +x backend/web-ui-mgmt
 
-# Create systemd service
-print_status "Creating systemd service..."
+# Create systemd service for loading rules
+print_status "Creating rules loader service..."
+$SUDO_CMD tee /etc/systemd/system/web-ui-mgmt-rules.service > /dev/null << EOF
+[Unit]
+Description=Web UI Management - Load Firewall Rules and Routes
+After=network.target
+Before=web-ui-mgmt.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=$INSTALL_DIR/scripts/load-rules.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create main systemd service
+print_status "Creating main systemd service..."
 $SUDO_CMD tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null << EOF
 [Unit]
 Description=Web UI Management - Firewall & Routing Control Panel
-After=network.target
+After=network.target web-ui-mgmt-rules.service
+Requires=web-ui-mgmt-rules.service
 
 [Service]
 Type=simple
@@ -208,10 +227,12 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 WantedBy=multi-user.target
 EOF
 
-# Enable and start service
-print_status "Enabling and starting service..."
+# Enable and start services
+print_status "Enabling and starting services..."
 $SUDO_CMD systemctl daemon-reload
+$SUDO_CMD systemctl enable web-ui-mgmt-rules
 $SUDO_CMD systemctl enable $SERVICE_NAME
+$SUDO_CMD systemctl start web-ui-mgmt-rules
 $SUDO_CMD systemctl start $SERVICE_NAME
 
 # Configure firewall
