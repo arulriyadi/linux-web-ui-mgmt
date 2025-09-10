@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -138,8 +139,16 @@ func main() {
 	api.GET("/system/info", getSystemInfo)
 	
 	// Serve static files
-	r.Static("/static", "../frontend")
-	r.LoadHTMLGlob("../frontend/*.html")
+	// Get the directory where the binary is located
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatal("Failed to get executable path:", err)
+	}
+	execDir := filepath.Dir(execPath)
+	frontendPath := filepath.Join(execDir, "..", "frontend")
+	
+	r.Static("/static", frontendPath)
+	r.LoadHTMLGlob(filepath.Join(frontendPath, "*.html"))
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
