@@ -536,6 +536,16 @@
                     this.showNotification('Logged out', 'success');
                 },
                 
+                // Handle 401 responses (token expired)
+                handleAuthError(response) {
+                    if (response.status === 401) {
+                        this.logout();
+                        this.showNotification('Session expired - please login again', 'error');
+                        return true;
+                    }
+                    return false;
+                },
+                
                 async loadData() {
                     if (!this.isAuthenticated) return;
                     
@@ -557,6 +567,8 @@
                         }
                     });
                     
+                    if (this.handleAuthError(response)) return;
+                    
                     if (response.ok) {
                         const data = await response.json();
                         this.firewallRules = data.rules;
@@ -570,6 +582,8 @@
                         }
                     });
                     
+                    if (this.handleAuthError(response)) return;
+                    
                     if (response.ok) {
                         const data = await response.json();
                         this.routes = data.routes;
@@ -582,6 +596,8 @@
                             'Authorization': `Bearer ${this.token}`
                         }
                     });
+                    
+                    if (this.handleAuthError(response)) return;
                     
                     if (response.ok) {
                         const data = await response.json();
@@ -599,6 +615,8 @@
                             },
                             body: JSON.stringify(this.newFirewallRule)
                         });
+                        
+                        if (this.handleAuthError(response)) return;
                         
                         const data = await response.json();
                         
@@ -626,6 +644,8 @@
                             }
                         });
                         
+                        if (this.handleAuthError(response)) return;
+                        
                         const data = await response.json();
                         
                         if (response.ok) {
@@ -649,6 +669,8 @@
                             },
                             body: JSON.stringify(this.newRoute)
                         });
+                        
+                        if (this.handleAuthError(response)) return;
                         
                         const data = await response.json();
                         
@@ -675,6 +697,8 @@
                                 'Authorization': `Bearer ${this.token}`
                             }
                         });
+                        
+                        if (this.handleAuthError(response)) return;
                         
                         const data = await response.json();
                         

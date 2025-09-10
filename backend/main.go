@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -89,8 +91,26 @@ type RouteRequest struct {
 var config Config
 var firewallRules []FirewallRule
 var routes []Route
+var startupTime time.Time
+var dynamicSecret string
+
+// Generate a random secret key for JWT signing
+func generateDynamicSecret() {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Warning: Failed to generate random secret, using fallback: %v", err)
+		dynamicSecret = fmt.Sprintf("fallback-secret-%d", time.Now().Unix())
+	} else {
+		dynamicSecret = hex.EncodeToString(bytes)
+	}
+	log.Printf("Generated dynamic JWT secret for this session")
+}
 
 func main() {
+	// Set startup time and generate dynamic secret
+	startupTime = time.Now()
+	generateDynamicSecret()
+	
 	// Load configuration
 	loadConfig()
 	
@@ -212,13 +232,22 @@ func authMiddleware() gin.HandlerFunc {
 		}
 		
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(config.SecretKey), nil
+			return []byte(dynamicSecret), nil
 		})
 		
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
+		}
+		
+		// Check if token was issued before server startup (invalidate old tokens)
+		if claims, ok := token.Claims.(*Claims); ok {
+			if claims.IssuedAt != nil && claims.IssuedAt.Time.Before(startupTime) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token expired - server restarted"})
+				c.Abort()
+				return
+			}
 		}
 		
 		c.Next()
@@ -246,7 +275,7 @@ func login(c *gin.Context) {
 	}
 	
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(config.SecretKey))
+	tokenString, err := token.SignedString([]byte(dynamicSecret))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 		return
