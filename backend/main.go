@@ -381,6 +381,56 @@ func loadRoutes() {
 	}
 }
 
+// Save firewall rules to make them persistent
+func saveFirewallRules() error {
+	cmd := exec.Command("iptables-save")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get iptables rules: %v", err)
+	}
+	
+	// Save to /etc/iptables/rules.v4 (Ubuntu/Debian) or /etc/sysconfig/iptables (CentOS/RHEL)
+	// Try Ubuntu/Debian first
+	if err := os.MkdirAll("/etc/iptables", 0755); err == nil {
+		if err := os.WriteFile("/etc/iptables/rules.v4", output, 0644); err == nil {
+			log.Println("Firewall rules saved to /etc/iptables/rules.v4")
+			return nil
+		}
+	}
+	
+	// Try CentOS/RHEL
+	if err := os.WriteFile("/etc/sysconfig/iptables", output, 0644); err == nil {
+		log.Println("Firewall rules saved to /etc/sysconfig/iptables")
+		return nil
+	}
+	
+	return fmt.Errorf("failed to save firewall rules to any standard location")
+}
+
+// Save routes to make them persistent
+func saveRoutes() error {
+	cmd := exec.Command("ip", "route", "show")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get routes: %v", err)
+	}
+	
+	// Save to /etc/network/routes (Ubuntu/Debian) or /etc/sysconfig/static-routes (CentOS/RHEL)
+	// Try Ubuntu/Debian first
+	if err := os.WriteFile("/etc/network/routes", output, 0644); err == nil {
+		log.Println("Routes saved to /etc/network/routes")
+		return nil
+	}
+	
+	// Try CentOS/RHEL
+	if err := os.WriteFile("/etc/sysconfig/static-routes", output, 0644); err == nil {
+		log.Println("Routes saved to /etc/sysconfig/static-routes")
+		return nil
+	}
+	
+	return fmt.Errorf("failed to save routes to any standard location")
+}
+
 func getFirewallRules(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"rules": firewallRules})
 }
@@ -417,6 +467,11 @@ func addFirewallRule(c *gin.Context) {
 	if err := cmd.Run(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add rule: %v", err)})
 		return
+	}
+	
+	// Save rules to make them persistent
+	if err := saveFirewallRules(); err != nil {
+		log.Printf("Warning: Failed to save firewall rules: %v", err)
 	}
 	
 	// Reload rules
@@ -503,6 +558,11 @@ func addRoute(c *gin.Context) {
 	if err := cmd.Run(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add route: %v", err)})
 		return
+	}
+	
+	// Save routes to make them persistent
+	if err := saveRoutes(); err != nil {
+		log.Printf("Warning: Failed to save routes: %v", err)
 	}
 	
 	// Reload routes
